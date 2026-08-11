@@ -1,0 +1,56 @@
+/* 
+
+============================================================================
+Creating database and Schema 
+============================================================================
+
+1:- USE MASTER TABLE to create a database 
+The master table is a system database in which we create our database, as we have created datawarehouse.
+
+2:- T-SQL for creating dynamic script
+I have added T-SQL code for error handling. If in database 'datawarehouse' database exists, it will drop
+the datawarehouse and recreate it.
+Note-- If it exists, it will delete everything, so be very careful 
+
+============================================================================
+*/
+
+USE MASTER;
+GO
+
+-- Drop and recreate the database if it already exists
+
+IF EXISTS (SELECT 1 FROM sys.database WHERE name = 'datawarehouse')
+
+BEGIN
+ALTER DATABASE datawarehouse
+SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+DROP DATABASE datawarehouse;
+END;
+GO
+
+-- create the 'datawarehouse' database
+
+CREATE DATABASE	datawarehouse;
+GO
+
+/* =======================================================================
+Creating schema for the database 
+Bronze for row data.
+Silver for cleaned data.
+Gold for business and data analysis.
+==========================================================================
+*/
+
+USE datawarehouse;
+GO
+
+CREATE SCHEMA bronze;
+GO
+
+CREATE SCHEMA silver;
+GO
+
+CREATE SCHEMA gold;
+GO
