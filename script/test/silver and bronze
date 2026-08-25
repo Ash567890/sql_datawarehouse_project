@@ -1,0 +1,123 @@
+use datawarehouse;
+go
+-- Quality check for silver and bronze layer 
+-- All the code is an abstract of real code for quality check
+
+select * 
+from silver.crm_cust_info
+where cst_id = 11016;
+
+select count(*), cst_id 
+from silver.crm_cust_info
+group by cst_id
+having count(*) > 1;
+
+
+select distinct cst_gndr -- cst-marital_status
+from silver.crm_cust_info;
+
+select *
+from silver.crm_cust_info
+where cst_firstname != TRIM(cst_firstname);-- cst_lastname, cst_gndr, cst_marital_status
+
+TRUNCATE TABLE silver.crm_cust_info;
+
+select * from silver.crm_cust_info;
+
+
+--========================================================================================
+
+select * from bronze.crm_prd_info;
+
+select count(*), prd_id
+from silver.crm_prd_info
+group by prd_id
+having count(*) > 1 or prd_id is null;
+
+select prd_nm from silver.crm_prd_info
+where prd_nm ! = TRIM(prd_nm);
+
+select prd_cost from silver.crm_prd_info
+where prd_cost < 0 or prd_cost is null ;
+
+select 
+REPLACE(SUBSTRING(prd_key,1,CHARINDEX('-', prd_key, CHARINDEX('-', prd_key) + 1 )-1),'-','_') prd_key 
+from bronze.crm_prd_info
+where REPLACE(SUBSTRING(prd_key,1,CHARINDEX('-', prd_key, CHARINDEX('-', prd_key) + 1 )-1),'-','_')
+not in 
+(select distinct id from bronze.erp_px_cat_g1v2);
+
+select distinct prd_line from bronze.crm_prd_info;
+
+select prd_start_dt, prd_end_dt from bronze.crm_prd_info
+where prd_start_dt > prd_end_dt;
+
+select prd_start_dt, prd_end_dt from silver.crm_prd_info
+where prd_end_dt < prd_start_dt;
+
+select prd_start_dt, prd_end_dt,
+dateadd(day, -1, lead(prd_start_dt) over (partition by prd_key order by prd_start_dt))
+from bronze.crm_prd_info;
+
+--=============================================================================================
+select * from bronze.crm_sales_details
+
+select sls_ord_num from bronze.crm_sales_details
+where sls_ord_num != TRIM(sls_ord_num);
+
+select * from bronze.crm_sales_details
+--where sls_prd_key not in (select prd_key from silver.crm_prd_info)
+where sls_cust_id not in (select cst_id from silver.crm_cust_info);
+
+select sls_order_dt from bronze.crm_sales_details
+where sls_order_dt = 0;
+
+select sls_order_dt from bronze.crm_sales_details
+where len(sls_order_dt) != 8;
+
+select sls_order_dt from bronze.crm_sales_details
+where len(sls_ship_dt) != 8; --- correct
+
+select sls_order_dt from bronze.crm_sales_details
+where sls_ship_dt = 0 or sls_ship_dt is null;
+
+select * from bronze.crm_sales_details
+where sls_sales != sls_quantity * sls_price;
+
+
+select sls_sales,
+case 
+	when sls_sales is null or sls_sales <= 0 or sls_sales != sls_quantity * abs(sls_price)
+	then sls_quantity * ABS(sls_price)
+	else sls_sales
+end sls_sales1,
+sls_price,
+sls_quantity,
+Case 
+	when sls_price is null or sls_price <= 0
+	then abs(sls_sales)/nullif(sls_quantity,0)
+	else sls_price
+end sls_price1
+from bronze.crm_sales_details
+where sls_sales is null or sls_sales <= 0 or sls_sales != sls_quantity * abs(sls_price)
+or sls_price <= 0 or sls_price is null
+
+select * from silver.crm_sales_details
+where sls_order_dt > sls_ship_dt or sls_order_dt > sls_due_dt;
+
+select sls_sales,
+sls_price,
+sls_quantity
+from silver.crm_sales_details
+where sls_sales is null or sls_sales <= 0 or sls_sales != sls_quantity * abs(sls_price)
+or sls_price <= 0 or sls_price is null
+
+-----------------------------------------------------------------------------------------
+
+select distinct gen,
+case 
+    when upper(trim(gen)) in ('F', 'FEMALE') THEN 'Female'
+    when upper(trim(gen)) in ('M', 'MALE') THEN 'Male'
+    else 'n/a'
+END gen
+from bronze.erp_cust_az12
